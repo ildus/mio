@@ -1,11 +1,14 @@
 package main
 
 import (
-	"gopkg.in/go-playground/validator.v8"
+	"github.com/paypal/gatt"
+	validator "gopkg.in/go-playground/validator.v8"
+	"log"
 	"time"
 )
 
 type Gid uint16
+type LGid string
 
 // Standart
 const (
@@ -36,8 +39,8 @@ const (
 	CMD_TYPE_BIKE_GET
 	CMD_TYPE_APPTYPE_GET
 	CMD_TYPE_APPTYPE_SET
-	CMD_TYPE_USEINFO_GET
-	CMD_TYPE_USEINFO_SET
+	CMD_TYPE_USERINFO_GET
+	CMD_TYPE_USERINFO_SET
 	CMD_TYPE_NAME_GET
 	CMD_TYPE_NAME_SET
 	CMD_TYPE_RTC_GET
@@ -115,10 +118,10 @@ type UserInfo struct {
 	WORecording        byte `validate:"min=0,max=1"`
 	HRAutoAdj          byte `validate:"min=0,max=1"`
 	Birthday           time.Time
-	BodyWeight         uint16 `validate:"min=20,max=200"`
-	BodyHeight         uint16 `validate:"min=69,max=231"`
-	ResetHR            uint16 `validate:"min=30,max=140,ltfield=MaxHR"`
-	MaxHR              uint16 `validate:"min=80,max=220"`
+	BodyWeight         byte `validate:"min=20,max=200"`
+	BodyHeight         byte `validate:"min=69,max=231"`
+	ResetHR            byte `validate:"min=30,max=140,ltfield=MaxHR"`
+	MaxHR              byte `validate:"min=80,max=220"`
 }
 
 // userinfo bitmask values
@@ -133,10 +136,16 @@ const (
 	FLAG_ADJ_HR
 )
 
-var validate *validator.Validate
+var (
+	validate *validator.Validate
+)
 
 func (i Gid) asUUID() []gatt.UUID {
 	return []gatt.UUID{gatt.UUID16(uint16(i))}
+}
+
+func (i LGid) asUUID() []gatt.UUID {
+	return []gatt.UUID{gatt.MustParseUUID(string(i))}
 }
 
 func initValidator() {
@@ -144,16 +153,15 @@ func initValidator() {
 	validate = validator.New(config)
 }
 
-func (u *UserInfo) CmdSet() (int, *[]byte) {
+func (u *UserInfo) Pack() *[]byte {
 	var flags byte = 0
 
-	errs := validate.Struct(user)
+	errs := validate.Struct(u)
 	if errs != nil {
 		log.Println("Validation error", errs)
-		return 0, nil
+		return nil
 	}
 	data := make([]byte, 10)
-	cmd := CMD_TYPE_USEINFO_SET
 
 	if u.Gender == 1 {
 		flags |= FLAG_GENDER
@@ -187,17 +195,21 @@ func (u *UserInfo) CmdSet() (int, *[]byte) {
 		flags |= FLAG_ADJ_HR
 	}
 
-	data[0] = 8
+	data[0] = 8 //i don't know what it's mean
 	data[1] = 0 //msg_user_settings_set
 	data[2] = flags
-	data[3] = u.Birthday.Day()
-	data[4] = u.Birthday.Month()
-	data[5] = u.Birthday.Year()
+	data[3] = byte(u.Birthday.Day())
+	data[4] = byte(u.Birthday.Month())
+	data[5] = byte(u.Birthday.Year())
 	data[6] = u.BodyWeight
 	data[7] = u.BodyHeight
 	data[8] = u.ResetHR
 	data[9] = u.MaxHR
-	return cmd, data
+	return &data
+}
+
+func (u *UserInfo) Unpack(data *[]byte) {
+
 }
 
 /*
