@@ -18,17 +18,6 @@ var (
 	baseDeviceId string
 )
 
-type Gid uint16
-
-const (
-	SERVICE_BATTERY Gid = 0x180F
-	CHAR_BATTERY    Gid = 0x2A19
-)
-
-func (i Gid) asUUID() []gatt.UUID {
-	return []gatt.UUID{gatt.UUID16(uint16(i))}
-}
-
 func loadConfiguration() {
 	confText, err := ioutil.ReadFile(*conffile)
 	if err != nil {
@@ -133,6 +122,7 @@ func onPeriphDisconnected(p gatt.Peripheral, err error) {
 func main() {
 	flag.Parse()
 	loadConfiguration()
+	initValidator()
 
 	d, err := gatt.NewDevice(option.DefaultClientOptions...)
 	if err != nil {
