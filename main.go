@@ -56,6 +56,7 @@ func onStateChanged(d gatt.Device, s gatt.State) {
 }
 
 func onPeriphDiscovered(p gatt.Peripheral, a *gatt.Advertisement, rssi int) {
+	log.Println("dev lescan:", p.ID())
 	if strings.ToUpper(p.ID()) != strings.ToUpper(baseDeviceId) {
 		return
 	}
@@ -64,7 +65,7 @@ func onPeriphDiscovered(p gatt.Peripheral, a *gatt.Advertisement, rssi int) {
 	p.Device().StopScanning()
 
 	if len(p.Name()) > 0 {
-		log.Println("Device found: ", p.Name())
+		log.Println("Device found:", p.Name())
 	} else {
 		log.Println("Device found")
 	}
