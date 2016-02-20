@@ -66,7 +66,7 @@ func onPeriphDiscovered(p gatt.Peripheral, a *gatt.Advertisement, rssi int) {
 	p.Device().Connect(p)
 }
 
-func getServiceById(p gatt.Peripheral, serviceId Gid, name string) *gatt.Service {
+func getServiceById(p gatt.Peripheral, serviceId SearchUid, name string) *gatt.Service {
 	serv, err := p.DiscoverServices(serviceId.asUUID())
 	if (err != nil) || (len(serv) == 0) {
 		log.Fatalf("%s service not found", name)
@@ -105,6 +105,25 @@ func checkBatteryLevel(p gatt.Peripheral) {
 			log.Fatal("Failed to subscribe battery characteristic, err: %s\n", err)
 		}
 	}
+}
+
+func getUserInfo(p gatt.Peripheral) {
+	serv := getServiceById(p, SERVICE_MIO_SPORT, "Configuration")
+
+	log.Printf("Configuration service found (service=%s)\n", serv.UUID().String())
+
+	cs, err := p.DiscoverCharacteristics(CHARACTERISTIC_MIO_SPORT_MSG.asUUID(), serv)
+	if err != nil || len(cs) == 0 {
+		log.Fatal("Failed to discover userinfo characteristics, err: %s\n", err)
+	}
+
+	// read current value
+	chr := cs[0]
+	val, err := p.ReadCharacteristic(chr)
+	if err != nil {
+		log.Println("Error reading char level: ", err)
+	}
+	log.Printf("Userinfo characteristic value: %d%%\n", val[0])
 	close(done)
 }
 
@@ -113,6 +132,7 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 	defer p.Device().CancelConnection(p)
 
 	checkBatteryLevel(p)
+	getUserInfo(p)
 }
 
 func onPeriphDisconnected(p gatt.Peripheral, err error) {

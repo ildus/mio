@@ -22,12 +22,12 @@ const (
 
 // Not standart UUIDs
 const (
-	SERVICE_MIO_SPORT                 = "6C721838-5BF1-4F64-9170-381C08EC57EE"
-	CHARACTERISTIC_MIO_SPORT_MSG      = "6C722A80-5BF1-4F64-9170-381C08EC57EE" //read write 0001
-	CHARACTERISTIC_MIO_SPORT_UNKNOWN  = "6C722A81-5BF1-4F64-9170-381C08EC57EE" //read write 00
-	CHARACTERISTIC_MIO_SPORT_MSG_RESP = "6C722A82-5BF1-4F64-9170-381C08EC57EE" //read notify
-	CHARACTERISTIC_MIO_SENSOR         = "6C722A83-5BF1-4F64-9170-381C08EC57EE" //read notify
-	CHARACTERISTIC_MIO_RECORD         = "6C722A84-5BF1-4F64-9170-381C08EC57EE" //read notify
+	SERVICE_MIO_SPORT                 LGid = "6C721838-5BF1-4F64-9170-381C08EC57EE"
+	CHARACTERISTIC_MIO_SPORT_MSG      LGid = "6C722A80-5BF1-4F64-9170-381C08EC57EE" //read write 0001
+	CHARACTERISTIC_MIO_SPORT_UNKNOWN       = "6C722A81-5BF1-4F64-9170-381C08EC57EE" //read write 00
+	CHARACTERISTIC_MIO_SPORT_MSG_RESP      = "6C722A82-5BF1-4F64-9170-381C08EC57EE" //read notify
+	CHARACTERISTIC_MIO_SENSOR              = "6C722A83-5BF1-4F64-9170-381C08EC57EE" //read notify
+	CHARACTERISTIC_MIO_RECORD              = "6C722A84-5BF1-4F64-9170-381C08EC57EE" //read notify
 )
 
 // commands
@@ -108,6 +108,14 @@ const (
 	CMD_RUN_ADL_MEM_CLEAR
 )
 
+//messages
+const (
+	MSG_USER_SETTING_GET = 3
+	MSG_USER_SETTING_SET = 4
+	MSG_DEVICE_NAME_GET  = 5
+	MSG_DEVICE_NAME_SET  = 6
+)
+
 type UserInfo struct {
 	Gender             byte `validate:"min=0,max=1"`
 	UnitType           byte `validate:"min=0,max=1"`
@@ -140,6 +148,10 @@ var (
 	validate *validator.Validate
 )
 
+type SearchUid interface {
+	asUUID() []gatt.UUID
+}
+
 func (i Gid) asUUID() []gatt.UUID {
 	return []gatt.UUID{gatt.UUID16(uint16(i))}
 }
@@ -163,44 +175,44 @@ func (u *UserInfo) Pack() *[]byte {
 	}
 	data := make([]byte, 10)
 
-	if u.Gender == 1 {
+	if u.Gender != 0 {
 		flags |= FLAG_GENDER
 	}
 
-	if u.UnitType == 1 {
+	if u.UnitType != 0 {
 		flags |= FLAG_UNIT_TYPE
 	}
 
-	if u.HRDisplayType == 1 {
+	if u.HRDisplayType != 0 {
 		flags |= FLAG_DISPLAY_TYPE_HR
 	}
 
-	if u.DisplayOrientation == 1 {
+	if u.DisplayOrientation != 0 {
 		flags |= FLAG_DISPLAY_ORIENTATION
 	}
 
-	if u.WODisplayMode == 1 {
+	if u.WODisplayMode != 0 {
 		flags |= FLAG_DISPLAY_MODE_WO
 	}
 
-	if u.ADLGoalCal == 1 {
+	if u.ADLGoalCal != 0 {
 		flags |= FLAG_GOAL_ADL
 	}
 
-	if u.WORecording == 1 {
+	if u.WORecording != 0 {
 		flags |= FLAG_RECORDING_WO
 	}
 
-	if u.HRAutoAdj == 1 {
+	if u.HRAutoAdj != 0 {
 		flags |= FLAG_ADJ_HR
 	}
 
-	data[0] = 8 //i don't know what it's mean
-	data[1] = 0 //msg_user_settings_set
+	data[0] = 8 //don't know what it's mean
+	data[1] = MSG_USER_SETTING_SET
 	data[2] = flags
 	data[3] = byte(u.Birthday.Day())
 	data[4] = byte(u.Birthday.Month())
-	data[5] = byte(u.Birthday.Year())
+	data[5] = byte(u.Birthday.Year() - 1900)
 	data[6] = u.BodyWeight
 	data[7] = u.BodyHeight
 	data[8] = u.ResetHR
@@ -208,8 +220,27 @@ func (u *UserInfo) Pack() *[]byte {
 	return &data
 }
 
-func (u *UserInfo) Unpack(data *[]byte) {
+func (u *UserInfo) Unpack(data []byte) {
+	if data[2] != MSG_USER_SETTING_GET {
+		log.Fatal("Trying to unpack wrong data")
+	}
 
+	flags := data[4]
+	u.Gender = flags & FLAG_GENDER
+	u.UnitType = flags & FLAG_UNIT_TYPE
+	u.HRDisplayType = flags & FLAG_DISPLAY_TYPE_HR
+	u.DisplayOrientation = flags & FLAG_DISPLAY_ORIENTATION
+	u.WODisplayMode = flags & FLAG_DISPLAY_MODE_WO
+	u.ADLGoalCal = flags & FLAG_GOAL_ADL
+	u.WORecording = flags & FLAG_RECORDING_WO
+	u.HRAutoAdj = flags & FLAG_ADJ_HR
+
+	u.Birthday = time.Date(int(data[7]), time.Month(data[6]), int(data[5]), 0, 0,
+		0, 0, time.UTC)
+	u.BodyWeight = data[8]
+	u.BodyHeight = data[9]
+	u.ResetHR = data[10]
+	u.MaxHR = data[11]
 }
 
 /*
